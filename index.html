@@ -220,9 +220,9 @@ h2 {
 
 .tile {
   --grow: 20;
-  flex: var(--grow) 1 92px;
-  min-width: 82px;
-  min-height: 54px;
+  flex: var(--grow) 1 78px;
+  min-width: 68px;
+  min-height: 46px;
   max-height: 150px;
   border: 1px solid #20252c;
   background: var(--tile-bg);
@@ -230,8 +230,8 @@ h2 {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
-  padding: 8px;
+  gap: 2px;
+  padding: 5px 4px;
   overflow: hidden;
   text-align: center;
   border-radius: 0;
@@ -246,13 +246,14 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(13px, 1.2rem, 22px);
-  line-height: 1.1;
+  font-size: clamp(10px, 0.82rem, 15px);
+  line-height: 1.05;
 }
 
 .tile span {
-  font-size: clamp(12px, 1rem, 17px);
+  font-size: clamp(10px, 0.78rem, 14px);
   font-weight: 700;
+  line-height: 1.05;
 }
 
 .tile small {
@@ -260,6 +261,8 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.05;
 }
 
 .detailPanel {
@@ -396,9 +399,22 @@ h2 {
   }
 
   .tile {
-    flex-basis: 82px;
-    min-height: 58px;
-    padding: 6px;
+    flex-basis: 64px;
+    min-width: 58px;
+    min-height: 42px;
+    padding: 4px 3px;
+  }
+
+  .tile strong {
+    font-size: 10px;
+  }
+
+  .tile span {
+    font-size: 10px;
+  }
+
+  .tile small {
+    display: none;
   }
 
   .detailPanel {
