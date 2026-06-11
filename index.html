@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A股实时涨跌热力图</title>
+    <style>
+:root {
+  --bg: #070809;
+  --panel: #101318;
+  --panel-2: #151a21;
+  --line: #27303a;
+  --line-2: #1d232b;
+  --text: #eef3f8;
+  --muted: #8e9aaa;
+  --red: #ff6f7d;
+  --green: #43d17a;
+  --yellow: #ffd166;
+  --blue: #64b5f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 1120px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  border: 1px solid var(--line);
+  background: #0d1117;
+  color: var(--text);
+}
+
+button,
+select {
+  height: 34px;
+  cursor: pointer;
+}
+
+button:hover,
+button.active,
+select:focus,
+input:focus {
+  border-color: var(--blue);
+  outline: none;
+}
+
+.screen {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: 260px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #090b0f;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+h2 {
+  font-size: 18px;
+}
+
+#status,
+#boardMeta {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.indexStrip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(92px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.indexItem {
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+}
+
+.indexItem span,
+.indexItem small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.indexItem strong {
+  display: block;
+  margin: 3px 0;
+  font-size: 16px;
+}
+
+.controls,
+.toolbar,
+.segmented,
+.marketStats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.segmented {
+  padding: 2px;
+  border: 1px solid var(--line);
+  background: #0d1117;
+  border-radius: 6px;
+}
+
+.segmented button {
+  min-width: 54px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.segmented button.active {
+  background: #253244;
+}
+
+.controls button,
+.controls select,
+.toolbar select,
+.detailHead select {
+  padding: 0 10px;
+  border-radius: 6px;
+}
+
+.content {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+}
+
+.heatmapPanel,
+.detailPanel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.heatmapPanel {
+  border-right: 1px solid var(--line);
+}
+
+.toolbar {
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.marketStats {
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.toolbar input {
+  width: 320px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 6px;
+}
+
+.heatmap {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: stretch;
+  gap: 3px;
+  padding: 4px;
+  overflow: auto;
+  background: #050607;
+}
+
+.tile {
+  --grow: 20;
+  flex: var(--grow) 1 92px;
+  min-width: 82px;
+  min-height: 54px;
+  max-height: 150px;
+  border: 1px solid #20252c;
+  background: var(--tile-bg);
+  color: #f5f7fb;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  overflow: hidden;
+  text-align: center;
+  border-radius: 0;
+}
+
+.tile.selected {
+  border-color: #ffffff;
+  box-shadow: inset 0 0 0 1px #ffffff;
+}
+
+.tile strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(13px, 1.2rem, 22px);
+  line-height: 1.1;
+}
+
+.tile span {
+  font-size: clamp(12px, 1rem, 17px);
+  font-weight: 700;
+}
+
+.tile small {
+  color: rgba(255, 255, 255, 0.72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailPanel {
+  background: #090b0f;
+}
+
+.detailHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.stockList {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.stockRow {
+  display: grid;
+  grid-template-columns: 1fr 92px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #171d25;
+}
+
+.stockRow strong,
+.stockRow span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stockRow span,
+.stockNums span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stockNums {
+  text-align: right;
+}
+
+.stockNums b {
+  display: block;
+  font-size: 16px;
+}
+
+.up {
+  color: var(--red);
+}
+
+.down {
+  color: var(--green);
+}
+
+.flat {
+  color: var(--yellow);
+}
+
+.empty {
+  margin: auto;
+  color: var(--muted);
+  padding: 24px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  body {
+    min-width: 0;
+  }
+
+  .screen {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .topbar,
+  .content {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  h1 {
+    font-size: 18px;
+  }
+
+  .indexStrip {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .indexItem {
+    min-width: 116px;
+  }
+
+  .content {
+    min-height: 0;
+  }
+
+  .controls,
+  .toolbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .toolbar input {
+    width: 100%;
+  }
+
+  .heatmapPanel {
+    height: 64vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .heatmap {
+    align-content: flex-start;
+  }
+
+  .tile {
+    flex-basis: 82px;
+    min-height: 58px;
+    padding: 6px;
+  }
+
+  .detailPanel {
+    min-height: 46vh;
+  }
+
+  .detailHead {
+    position: sticky;
+    top: 144px;
+    z-index: 4;
+  }
+
+  .stockRow {
+    grid-template-columns: 1fr 80px;
+  }
+}
+
+</style>
+  </head>
+  <body>
+    <main class="screen">
+      <header class="topbar">
+        <div class="brand">
+          <h1>A股实时涨跌热力图</h1>
+          <p id="status">正在连接行情...</p>
+        </div>
+        <div class="indexStrip" id="indexStrip" aria-label="主要指数"></div>
+        <div class="controls">
+          <div class="segmented" role="tablist" aria-label="板块类型">
+            <button class="active" type="button" data-type="concept">概念</button>
+            <button type="button" data-type="industry">行业</button>
+          </div>
+          <label>
+            <span>刷新</span>
+            <select id="refreshSelect">
+              <option value="3000">3秒</option>
+              <option value="5000" selected>5秒</option>
+              <option value="10000">10秒</option>
+              <option value="0">手动</option>
+            </select>
+          </label>
+          <button id="refreshBtn" type="button">刷新</button>
+        </div>
+      </header>
+
+      <section class="content">
+        <section class="heatmapPanel" aria-label="板块热力图">
+          <div class="toolbar">
+            <div class="marketStats" id="marketStats"></div>
+            <input id="searchInput" type="search" placeholder="搜索板块，例如 CPO / PCB / 银行" />
+            <select id="limitSelect" aria-label="显示数量">
+              <option value="80">80个</option>
+              <option value="120" selected>120个</option>
+              <option value="180">180个</option>
+              <option value="260">260个</option>
+            </select>
+          </div>
+          <div class="heatmap" id="heatmap"></div>
+        </section>
+
+        <aside class="detailPanel">
+          <div class="detailHead">
+            <div>
+              <h2 id="boardTitle">选择一个板块</h2>
+              <p id="boardMeta">点击热力图色块查看成分股</p>
+            </div>
+            <select id="sortSelect" aria-label="成分股排序">
+              <option value="pct">按涨幅</option>
+              <option value="amount">按成交额</option>
+              <option value="mainNet">按主力净额</option>
+              <option value="turnover">按换手</option>
+            </select>
+          </div>
+          <div class="stockList" id="stockList"></div>
+        </aside>
+      </section>
+    </main>
+    <script>
+const BOARD_FIELDS = "f12,f14,f2,f3,f4,f5,f6,f7,f8,f20,f62,f104,f105,f106";
+const STOCK_FIELDS = "f12,f14,f2,f3,f4,f5,f6,f7,f8,f9,f10,f15,f16,f17,f18,f20,f21,f23,f62,f100";
+const INDEX_FIELDS = "f12,f14,f2,f3,f4,f5,f6";
+const INDEX_SECIDS = "1.000001,0.399001,0.399006,0.000300,0.000905,1.000688";
+const A_SHARE_FS = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23";
+
+const FIELD_MAP = {
+  f2: "price",
+  f3: "pct",
+  f4: "change",
+  f5: "volume",
+  f6: "amount",
+  f7: "amplitude",
+  f8: "turnover",
+  f9: "pe",
+  f10: "volumeRatio",
+  f12: "code",
+  f14: "name",
+  f15: "high",
+  f16: "low",
+  f17: "open",
+  f18: "prevClose",
+  f20: "marketCap",
+  f21: "floatMarketCap",
+  f23: "pb",
+  f62: "mainNet",
+  f100: "industry",
+  f104: "riseCount",
+  f105: "fallCount",
+  f106: "flatCount"
+};
+
+const state = {
+  type: "concept",
+  boards: [],
+  selected: null,
+  refreshMs: 5000,
+  timer: null,
+  sort: "pct"
+};
+
+const els = {
+  status: document.querySelector("#status"),
+  indexStrip: document.querySelector("#indexStrip"),
+  marketStats: document.querySelector("#marketStats"),
+  heatmap: document.querySelector("#heatmap"),
+  searchInput: document.querySelector("#searchInput"),
+  limitSelect: document.querySelector("#limitSelect"),
+  refreshSelect: document.querySelector("#refreshSelect"),
+  refreshBtn: document.querySelector("#refreshBtn"),
+  boardTitle: document.querySelector("#boardTitle"),
+  boardMeta: document.querySelector("#boardMeta"),
+  stockList: document.querySelector("#stockList"),
+  sortSelect: document.querySelector("#sortSelect")
+};
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function normalize(row) {
+  const out = {};
+  for (const [from, to] of Object.entries(FIELD_MAP)) out[to] = row[from];
+  return out;
+}
+
+function numeric(value, fallback = 0) {
+  if (value === "-" || value == null || Number.isNaN(Number(value))) return fallback;
+  return Number(value);
+}
+
+function signed(value, digits = 2) {
+  if (value === "-" || value == null || Number.isNaN(Number(value))) return "-";
+  const n = Number(value);
+  return `${n > 0 ? "+" : ""}${n.toFixed(digits)}`;
+}
+
+function money(value) {
+  if (value === "-" || value == null || Number.isNaN(Number(value))) return "-";
+  const n = Number(value);
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 100000000) return `${sign}${(abs / 100000000).toFixed(2)}亿`;
+  if (abs >= 10000) return `${sign}${(abs / 10000).toFixed(1)}万`;
+  return `${Math.round(n)}`;
+}
+
+function toneClass(value) {
+  const n = numeric(value);
+  if (n > 0.2) return "up";
+  if (n < -0.2) return "down";
+  return "flat";
+}
+
+function heatColor(value) {
+  const pct = numeric(value);
+  if (pct >= 7) return "#b8001f";
+  if (pct >= 4) return "#9b1426";
+  if (pct >= 2) return "#7f1d2c";
+  if (pct > 0.2) return "#5c2730";
+  if (pct <= -7) return "#067a3c";
+  if (pct <= -4) return "#0b6838";
+  if (pct <= -2) return "#165637";
+  if (pct < -0.2) return "#263f37";
+  return "#333943";
+}
+
+function setStatus(text, time) {
+  const stamp = time ? new Date(time) : new Date();
+  els.status.textContent = `${text} · ${stamp.toLocaleTimeString("zh-CN", { hour12: false })}`;
+}
+
+function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const callback = `em_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const separator = url.includes("?") ? "&" : "?";
+    const timer = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("行情接口超时"));
+    }, 12000);
+
+    function cleanup() {
+      window.clearTimeout(timer);
+      delete window[callback];
+      script.remove();
+    }
+
+    window[callback] = (data) => {
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("行情接口连接失败"));
+    };
+
+    script.src = `${url}${separator}cb=${callback}`;
+    document.head.appendChild(script);
+  });
+}
+
+function eastmoney(path, params) {
+  const query = new URLSearchParams(params).toString();
+  return jsonp(`https://push2delay.eastmoney.com/api/qt/${path}?${query}`);
+}
+
+function boardFs(type) {
+  return type === "industry" ? "m:90+t:2" : "m:90+t:3";
+}
+
+function marketPrefix(code) {
+  return code?.startsWith("6") ? "1" : "0";
+}
+
+async function loadBoards(type) {
+  const rows = [];
+  for (let page = 1; page <= 12; page += 1) {
+    const data = await eastmoney("clist/get", {
+      pn: String(page),
+      pz: "100",
+      po: "1",
+      np: "1",
+      fltt: "2",
+      invt: "2",
+      fid: "f3",
+      fs: boardFs(type),
+      fields: BOARD_FIELDS
+    });
+    const diff = data?.data?.diff || [];
+    rows.push(...diff.map(normalize));
+    if (rows.length >= Number(data?.data?.total || 0)) break;
+  }
+  return rows;
+}
+
+async function loadIndices() {
+  const data = await jsonp(`https://push2.eastmoney.com/api/qt/ulist.np/get?${new URLSearchParams({
+    secids: INDEX_SECIDS,
+    ut: "bd1d9ddb04089700cf9c27f6f7426281",
+    fltt: "2",
+    invt: "2",
+    fields: INDEX_FIELDS
+  })}`);
+  return (data?.data?.diff || []).map(normalize);
+}
+
+async function loadAshareStats() {
+  const data = await eastmoney("clist/get", {
+    pn: "1",
+    pz: "1",
+    po: "1",
+    np: "1",
+    fltt: "2",
+    invt: "2",
+    fid: "f3",
+    fs: A_SHARE_FS,
+    fields: "f3"
+  });
+  return { total: Number(data?.data?.total || 0) };
+}
+
+async function loadBoardStocks(code, sort, order) {
+  const sortField = {
+    pct: "f3",
+    amount: "f6",
+    turnover: "f8",
+    mainNet: "f62",
+    price: "f2"
+  }[sort] || "f3";
+
+  const data = await eastmoney("clist/get", {
+    pn: "1",
+    pz: "300",
+    po: order === "asc" ? "0" : "1",
+    np: "1",
+    fltt: "2",
+    invt: "2",
+    fid: sortField,
+    fs: `b:${code}`,
+    fields: STOCK_FIELDS
+  });
+
+  return (data?.data?.diff || []).map(normalize).map((row) => ({
+    ...row,
+    secid: `${marketPrefix(row.code)}.${row.code}`
+  }));
+}
+
+function filteredBoards() {
+  const q = els.searchInput.value.trim().toLowerCase();
+  const limit = Number(els.limitSelect.value);
+  const rows = q
+    ? state.boards.filter((row) => `${row.name}${row.code}`.toLowerCase().includes(q))
+    : state.boards;
+  return rows.slice(0, limit);
+}
+
+function renderIndices(rows) {
+  els.indexStrip.innerHTML = rows
+    .map((row) => `<div class="indexItem">
+      <span>${escapeHtml(row.name)}</span>
+      <strong class="${toneClass(row.pct)}">${signed(row.pct)}%</strong>
+      <small>${signed(row.change)}</small>
+    </div>`)
+    .join("");
+}
+
+function renderStats(stats, boards) {
+  const up = boards.filter((row) => numeric(row.pct) > 0.2).length;
+  const down = boards.filter((row) => numeric(row.pct) < -0.2).length;
+  const flat = boards.length - up - down;
+  els.marketStats.innerHTML = `
+    <span>A股 ${stats.total || "-"} 只</span>
+    <span class="up">上涨板块 ${up}</span>
+    <span class="down">下跌板块 ${down}</span>
+    <span>平盘 ${flat}</span>
+  `;
+}
+
+function renderHeatmap() {
+  const rows = filteredBoards();
+  if (!rows.length) {
+    els.heatmap.innerHTML = '<div class="empty">没有匹配的板块</div>';
+    return;
+  }
+
+  const amounts = rows.map((row) => Math.max(numeric(row.amount), 1));
+  const min = Math.log10(Math.min(...amounts));
+  const max = Math.log10(Math.max(...amounts));
+  const span = Math.max(max - min, 1);
+
+  els.heatmap.innerHTML = rows
+    .map((row) => {
+      const amountScore = (Math.log10(Math.max(numeric(row.amount), 1)) - min) / span;
+      const grow = Math.round(12 + amountScore * 44);
+      const selected = state.selected?.code === row.code ? " selected" : "";
+      const rise = numeric(row.riseCount);
+      const fall = numeric(row.fallCount);
+      const total = rise + fall + numeric(row.flatCount);
+      const ratioText = total ? `涨 ${rise} 跌 ${fall}` : `成交 ${money(row.amount)}`;
+      return `<button class="tile${selected}" type="button" data-code="${escapeHtml(row.code)}" data-name="${escapeHtml(row.name)}"
+        style="--grow:${grow}; --tile-bg:${heatColor(row.pct)}">
+        <strong>${escapeHtml(row.name)}</strong>
+        <span class="${toneClass(row.pct)}">${signed(row.pct)}%</span>
+        <small>${escapeHtml(row.code)} · ${ratioText}</small>
+      </button>`;
+    })
+    .join("");
+
+  els.heatmap.querySelectorAll(".tile").forEach((tile) => {
+    tile.addEventListener("click", () => {
+      state.selected = { code: tile.dataset.code, name: tile.dataset.name };
+      renderHeatmap();
+      loadStocks();
+    });
+  });
+}
+
+function renderStocks(rows, time) {
+  if (!state.selected) return;
+  const updateTime = new Date(time).toLocaleTimeString("zh-CN", { hour12: false });
+  els.boardTitle.textContent = state.selected.name;
+  els.boardMeta.textContent = `${state.selected.code} · ${rows.length} 只成分股 · ${updateTime}`;
+
+  if (!rows.length) {
+    els.stockList.innerHTML = '<div class="empty">暂无成分股数据</div>';
+    return;
+  }
+
+  els.stockList.innerHTML = rows.slice(0, 120).map((row) => `
+    <article class="stockRow">
+      <div>
+        <strong>${escapeHtml(row.name || "-")}</strong>
+        <span>${escapeHtml(row.code || "-")} · ${escapeHtml(row.industry || "-")}</span>
+      </div>
+      <div class="stockNums">
+        <b class="${toneClass(row.pct)}">${signed(row.pct)}%</b>
+        <span>${money(row.amount)}</span>
+      </div>
+    </article>
+  `).join("");
+}
+
+async function loadStocks() {
+  if (!state.selected) return;
+  els.stockList.innerHTML = '<div class="empty">正在加载成分股...</div>';
+  try {
+    const rows = await loadBoardStocks(state.selected.code, state.sort, "desc");
+    renderStocks(rows, Date.now());
+  } catch (error) {
+    els.stockList.innerHTML = `<div class="empty">成分股加载失败：${escapeHtml(error.message)}</div>`;
+  }
+}
+
+async function refreshMarket() {
+  setStatus("更新中");
+  try {
+    const [boards, indices, stats] = await Promise.all([
+      loadBoards(state.type),
+      loadIndices(),
+      loadAshareStats()
+    ]);
+    state.boards = boards;
+    if (!state.selected && state.boards.length) {
+      state.selected = { code: state.boards[0].code, name: state.boards[0].name };
+    }
+    renderIndices(indices);
+    renderStats(stats, state.boards);
+    renderHeatmap();
+    await loadStocks();
+    setStatus("行情已更新", Date.now());
+  } catch (error) {
+    setStatus(`更新失败：${error.message}`);
+  }
+}
+
+function resetTimer() {
+  if (state.timer) clearInterval(state.timer);
+  if (state.refreshMs > 0) state.timer = setInterval(refreshMarket, state.refreshMs);
+}
+
+function bindEvents() {
+  document.querySelectorAll(".segmented button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.type = button.dataset.type;
+      state.selected = null;
+      document.querySelectorAll(".segmented button").forEach((item) => item.classList.toggle("active", item === button));
+      refreshMarket();
+    });
+  });
+
+  els.searchInput.addEventListener("input", () => renderHeatmap());
+  els.limitSelect.addEventListener("change", () => renderHeatmap());
+  els.refreshBtn.addEventListener("click", refreshMarket);
+  els.refreshSelect.addEventListener("change", () => {
+    state.refreshMs = Number(els.refreshSelect.value);
+    resetTimer();
+  });
+  els.sortSelect.addEventListener("change", () => {
+    state.sort = els.sortSelect.value;
+    loadStocks();
+  });
+}
+
+bindEvents();
+refreshMarket();
+resetTimer();
+
+</script>
+  </body>
+</html>
+
